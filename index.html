@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Phishing & SMS Spam Detector</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
+      background: #f2f2f2;
+    }
+
+    h2 {
+      color: #333;
+    }
+
+    input[type="text"] {
+      padding: 10px;
+      width: 300px;
+      margin-right: 10px; 
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      padding: 10px 16px;
+      margin-top: 10px;
+      margin-right: 10px;
+      background-color: #4174b6;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .record {
+      background: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .delete-btn {
+      background-color: #e74c3c;
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    small {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .section {
+      margin-bottom: 40px;
+    }
+
+    #recordsContainer {
+      margin-top: 30px;
+    }
+
+    hr {
+      margin-top: 40px;
+      border: none;
+      height: 1px;
+      background: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <!-- ✅ Phishing Section -->
+  <div class="section">
+    <h2>Phishing URL Detector</h2>
+    <input type="text" id="urlInput" placeholder="Enter URL" />
+    <button onclick="checkURL()">Check</button>
+    <button onclick="fetchURLRecords()">📋 Show Recent URLs</button>
+    <div id="urlResult"></div>
+
+    <div id="recordsContainer">
+      <h3>Recent Checked URLs</h3>
+      <div id="recordsList"></div>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- ✅ SMS Section -->
+  <div class="section">
+    <h2>SMS Spam Detector</h2>
+    <input type="text" id="smsInput" placeholder="Enter SMS" />
+    <button onclick="checkSMS()">Check</button>
+    <button onclick="fetchSMSRecords()">📋 Show Recent SMS</button>
+    <div id="smsResult"></div>
+
+    <div id="smsRecordsContainer">
+      <h3>Recent Checked SMS</h3>
+      <div id="smsList"></div>
+    </div>
+  </div>
+
+  <script>
+    // ✅ Check Phishing URL
+    async function checkURL() {
+      const urlInput = document.getElementById("urlInput").value;
+      const resultDiv = document.getElementById("urlResult");
+      resultDiv.innerHTML = urlInput ? "🔍 Checking URL..." : "❌ Please enter a URL!";
+      if (!urlInput) return;
+
+      try {
+        const res = await fetch("http://localhost:5001/check-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: urlInput }),
+        });
+
+        const data = await res.json();
+        resultDiv.innerHTML = res.ok
+          ? `✅ Result: <strong>${data.prediction}</strong>`
+          : `❌ Error: ${data.error || "Unexpected error"}`;
+      } catch (err) {
+        resultDiv.innerHTML = "❌ Failed to connect to server!";
+      }
+    }
+
+    // ✅ Get Phishing URL Records
+    async function fetchURLRecords() {
+      const list = document.getElementById("recordsList");
+      list.innerHTML = "⏳ Loading...";
+      try {
+        const res = await fetch("http://localhost:5001/stored-urls");
+        const urls = await res.json();
+        list.innerHTML = "";
+        if (!urls.length) return (list.innerHTML = "No records found.");
+
+        urls.forEach((url) => {
+          const div = document.createElement("div");
+          div.className = "record";
+          const timestamp = new Date(url.timestamp).toLocaleString();
+          div.innerHTML = `
+            <span>
+              <strong>${url.prediction}</strong> - ${url.url}<br>
+              <small>🕒 ${timestamp}</small>
+            </span>
+            <button class="delete-btn" onclick="deleteURL('${url._id}')">Delete</button>
+          `;
+          list.appendChild(div);
+        });
+      } catch (err) {
+        list.innerHTML = "❌ Failed to load records.";
+      }
+    }
+
+    // ✅ Delete URL
+    async function deleteURL(id) {
+      try {
+        await fetch(`http://localhost:5001/delete-url/${id}`, { method: "DELETE" });
+        fetchURLRecords();
+      } catch {
+        alert("❌ Failed to delete URL.");
+      }
+    }
+
+    // ✅ Check SMS
+    async function checkSMS() {
+      const smsInput = document.getElementById("smsInput").value;
+      const resultDiv = document.getElementById("smsResult");
+      resultDiv.innerHTML = smsInput ? "🔍 Checking SMS..." : "❌ Please enter an SMS!";
+      if (!smsInput) return;
+
+      try {
+        const res = await fetch("http://localhost:5001/check-sms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sms: smsInput }),
+        });
+
+        const data = await res.json();
+        resultDiv.innerHTML = res.ok
+          ? `✅ Result: <strong>${data.prediction}</strong>`
+          : `❌ Error: ${data.error || "Unexpected error"}`;
+      } catch (err) {
+        resultDiv.innerHTML = "❌ Failed to connect to server!";
+      }
+    }
+
+    // ✅ Get SMS Records
+    async function fetchSMSRecords() {
+      const list = document.getElementById("smsList");
+      list.innerHTML = "⏳ Loading...";
+      try {
+        const res = await fetch("http://localhost:5001/stored-sms");
+        const msgs = await res.json();
+        list.innerHTML = "";
+        if (!msgs.length) return (list.innerHTML = "No records found.");
+
+        msgs.forEach((sms) => {
+          const div = document.createElement("div");
+          div.className = "record";
+          const timestamp = new Date(sms.timestamp).toLocaleString();
+          div.innerHTML = `
+            <span>
+              <strong>${sms.prediction}</strong> - ${sms.sms}<br>
+              <small>🕒 ${timestamp}</small>
+            </span>
+            <button class="delete-btn" onclick="deleteSMS('${sms._id}')">Delete</button>
+          `;
+          list.appendChild(div);
+        });
+      } catch (err) {
+        list.innerHTML = "❌ Failed to load records.";
+      }
+    }
+
+    // ✅ Delete SMS
+    async function deleteSMS(id) {
+      try {
+        await fetch(`http://localhost:5001/delete-sms/${id}`, { method: "DELETE" });
+        fetchSMSRecords();
+      } catch {
+        alert("❌ Failed to delete SMS.");
+      }
+    }
+  </script>
+</body>
+</html>
